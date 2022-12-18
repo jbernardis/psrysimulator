@@ -1,0 +1,342 @@
+import wx
+import wx.lib.newevent
+
+import json
+
+from settings import Settings
+
+
+from listener import Listener
+from rrserver import RRServer
+from script import Script
+from scrlist import ScriptListCtrl
+
+(DeliveryEvent, EVT_DELIVERY) = wx.lib.newevent.NewEvent() 
+(DisconnectEvent, EVT_DISCONNECT) = wx.lib.newevent.NewEvent() 
+
+
+class MainFrame(wx.Frame):
+	def __init__(self):
+		wx.Frame.__init__(self, None, style=wx.DEFAULT_FRAME_STYLE)
+		self.sessionid = None
+		self.subscribed = False
+		self.settings = Settings()
+		self.scripts = {}
+		self.blocks = {}
+		self.turnouts = {}
+		self.signals = {}
+		self.routes = {}
+		self.pausedScripts = []
+		self.listener = None
+		self.ticker = None
+		self.rrServer = None
+		self.selectedScripts = []
+		self.startable = []
+		self.stoppable = []
+
+		self.title = "PSRY Simulator"
+		self.Bind(wx.EVT_CLOSE, self.OnClose)
+		vsz = wx.BoxSizer(wx.VERTICAL)
+		hsz = wx.BoxSizer(wx.HORIZONTAL)
+
+		self.bSubscribe = wx.Button(self, wx.ID_ANY, "Connect")
+		self.Bind(wx.EVT_BUTTON, self.OnSubscribe, self.bSubscribe)
+
+		self.bRefresh = wx.Button(self, wx.ID_ANY, "Refresh")
+		self.Bind(wx.EVT_BUTTON, self.OnRefresh, self.bRefresh)
+		self.bRefresh.Enable(False)
+
+		self.bStart = wx.Button(self, wx.ID_ANY, "Start")
+		self.Bind(wx.EVT_BUTTON, self.OnStart, self.bStart)
+		self.bStart.Enable(False)
+
+		self.bStop = wx.Button(self, wx.ID_ANY, "Stop")
+		self.Bind(wx.EVT_BUTTON, self.OnStop, self.bStop)
+		self.bStop.Enable(False)
+
+		self.bClear = wx.Button(self, wx.ID_ANY, "Clear")
+		self.Bind(wx.EVT_BUTTON, self.OnClear, self.bClear)
+		self.bClear.Enable(False)
+
+		vsz.AddSpacer(20)
+
+		hsz.AddSpacer(20)
+		hsz.Add(self.bSubscribe)
+		hsz.AddSpacer(20)
+		hsz.Add(self.bRefresh)
+		hsz.AddSpacer(20)
+
+		vsz.Add(hsz)
+		vsz.AddSpacer(20)
+
+		self.scriptList = ScriptListCtrl(self)
+		hsz = wx.BoxSizer(wx.HORIZONTAL)
+		hsz.AddSpacer(20)
+		btnsz = wx.BoxSizer(wx.VERTICAL)
+		btnsz.AddSpacer(20)
+		btnsz.Add(self.bStart)
+		btnsz.AddSpacer(10)
+		btnsz.Add(self.bStop)
+		btnsz.AddSpacer(10)
+		btnsz.Add(self.bClear)
+		btnsz.AddSpacer(20)
+		hsz.Add(btnsz)
+		hsz.AddSpacer(10)
+		hsz.Add(self.scriptList)
+		hsz.AddSpacer(20)
+
+		vsz.Add(hsz)
+		vsz.AddSpacer(20)
+
+		self.SetSizer(vsz)
+		self.Fit()
+		self.Layout()
+
+		wx.CallAfter(self.Initialize)
+
+	def ShowTitle(self):
+		titleString = self.title
+		if self.subscribed and self.sessionid is not None:
+			titleString += ("  -  Session ID %d" % self.sessionid)
+		self.SetTitle(titleString)
+
+	def Initialize(self):
+		self.listener = None
+		self.ShowTitle()
+		self.Bind(EVT_DELIVERY, self.onDeliveryEvent)
+		self.Bind(EVT_DISCONNECT, self.onDisconnectEvent)
+
+		self.rrServer = RRServer()
+		self.rrServer.SetServerAddress(self.settings.ipaddr, self.settings.serverport)
+
+		self.ClearDataStructures()
+
+		with open("scripts.scr", "r") as jfp:
+			scripts = json.load(jfp)
+
+		for scr in scripts:
+			s = Script(self, scripts[scr], scr, self.cbComplete)
+			self.scripts[scr] = s
+			self.scriptList.AddScript(s)
+
+		print("finished initialize")
+
+	def reportSelection(self, tx):
+		selectedScripts = self.scriptList.GetChecked()
+		self.startable = [scr for scr in selectedScripts if not self.scripts[scr].IsRunning()]
+		self.stoppable = [scr for scr in selectedScripts if self.scripts[scr].IsRunning()]
+		self.enableButtons()
+
+	def enableButtons(self):
+		haveStartable = len(self.startable) > 0 and self.subscribed
+		self.bStart.Enable(haveStartable)
+		self.bClear.Enable(haveStartable)
+		self.bStop.Enable(len(self.stoppable) > 0 and self.subscribed)
+
+	def ClearDataStructures(self):
+		self.blocks = {}
+		self.turnouts = {}
+		self.signals = {}
+		self.routes = {}
+		self.pausedScripts = []
+
+	def OnSubscribe(self, _):
+		if self.subscribed:
+			self.listener.kill()
+			self.listener.join()
+			self.listener = None
+			self.subscribed = False
+			self.sessionid = None
+			self.bSubscribe.SetLabel("Connect")
+			self.bRefresh.Enable(False)
+			self.enableButtons()
+			self.ClearDataStructures()
+		else:
+			self.listener = Listener(self, self.settings.ipaddr, self.settings.socketport)
+			if not self.listener.connect():
+				print("Unable to establish connection with server")
+				self.listener = None
+				return
+
+			self.listener.start()
+			self.subscribed = True
+			self.bSubscribe.SetLabel("Disconnect")
+			self.bRefresh.Enable(True)
+			self.enableButtons()
+			self.SendBlockDirRequests()
+				
+		self.ShowTitle()
+
+	def OnRefresh(self, _):
+		self.rrServer.SendRequest({"refresh": {"SID": self.sessionid}})
+
+	def OnStart(self, _):
+		for scr in self.startable:
+			self.scripts[scr].Execute()
+		self.scriptList.ClearChecks()
+		self.startable = []
+		self.stoppable = []
+		self.enableButtons()
+
+	def OnStop(self, _):
+		for scr in self.stoppable:
+			self.scripts[scr].Stop()
+		self.scriptList.ClearChecks()
+		self.startable = []
+		self.stoppable = []
+		self.enableButtons()
+
+	def OnClear(self, _):
+		for scr in self.startable:
+			self.scripts[scr].RemoveTrain()
+		self.scriptList.ClearChecks()
+		self.startable = []
+		self.stoppable = []
+		self.enableButtons()
+
+	def cbComplete(self, scrName, errFlag):
+		print("script %s complete, error = %s" % (scrName, str(errFlag)))
+
+	def PauseScript(self, script):
+		self.pausedScripts.append(script)
+
+	def CheckResumeScripts(self):
+		delList = []
+		resumeList = []
+		for i in range(len(self.pausedScripts)):
+			scr = self.pausedScripts[i]
+			if not scr.CheckPause():
+				delList.append(i)
+				resumeList.append(scr)
+
+		for i in delList:
+			del(self.pausedScripts[i])
+
+		for scr in resumeList:
+			scr.Resume()
+
+	def SignalAspect(self, signal):
+		try:
+			return self.signals[signal]
+		except KeyError:
+			print("signal %s unknown" % signal)
+			return False
+
+	def BlockOccupied(self, block):
+		blist = block.split(",")
+		for b in blist:
+			if self.blocks[b][0] != 0:
+				return True
+		return False
+
+	def NotOSRoute(self, OS, rte):
+		route = self.routes[OS][0]
+		if rte != route:
+			return True
+		return False
+
+	def raiseDeliveryEvent(self, data):  # thread context
+		try:
+			jdata = json.loads(data)
+		except json.decoder.JSONDecodeError:
+			print("Unable to parse (%s)" % data)
+			return
+		evt = DeliveryEvent(data=jdata)
+		wx.QueueEvent(self, evt)
+
+	def onDeliveryEvent(self, evt):
+		for cmd, parms in evt.data.items():
+			# print("Dispatch: %s: %s" % (cmd, parms))
+			if cmd == "turnout":
+				for p in parms:
+					turnout = p["name"]
+					state = p["state"]
+					self.turnouts[turnout] = state
+				self.CheckResumeScripts()
+
+			elif cmd == "block":
+				for p in parms:
+					block = p["name"]
+					state = p["state"]
+					direction = p["dir"]
+					self.blocks[block] = [ state, direction]
+				self.CheckResumeScripts()
+					
+			elif cmd == "signal":
+				for p in parms:
+					sigName = p["name"]
+					aspect = p["aspect"]
+					self.signals[sigName] = aspect
+				self.CheckResumeScripts()
+
+			elif cmd == "setroute":
+				for p in parms:
+					blknm = p["block"]
+					rte = p["route"]
+					try:
+						ends = p["ends"]
+					except KeyError:
+						ends = None
+					self.routes[blknm] = [rte, ends]
+				self.CheckResumeScripts()
+											
+			elif cmd == "handswitch":
+				for p in parms:
+					hsName = p["name"]
+					state = p["state"]
+						
+			elif cmd == "indicator":
+				for p in parms:
+					iName = p["name"]
+					value = int(p["value"])
+
+			elif cmd == "breaker":
+				for p in parms:
+					name = p["name"]
+					val = p["value"]
+
+			elif cmd == "settrain":
+				for p in parms:
+					block = p["block"]
+					name = p["name"]
+					loco = p["loco"]
+
+			elif cmd == "sessionID":
+				self.sessionid = int(parms)
+				self.ShowTitle()
+		
+	def raiseDisconnectEvent(self): # thread context
+		evt = DisconnectEvent()
+		wx.PostEvent(self, evt)
+
+	def Request(self, req):
+		if self.subscribed:
+			# print("Outgoing request: %s" % json.dumps(req))
+			self.rrServer.SendRequest(req)
+
+	def SendBlockDirRequests(self):
+		pass
+		# for b in self.blocks.values():
+		# 	self.Request({"blockdir": { "block": b.GetName(), "dir": "E" if b.GetEast() else "W"}})
+		# 	sbw, sbe = b.GetStoppingSections()
+		# 	for sb in [sbw, sbe]:
+		# 		if sb:
+		# 			self.Request({"blockdir": { "block": sb.GetName(), "dir": "E" if b.GetEast() else "W"}})
+
+	def onDisconnectEvent(self, _):
+		self.listener = None
+		self.subscribed = False
+		self.sessionid = None
+		self.bSubscribe.SetLabel("Connect")
+		self.bRefresh.Enable(False)
+		self.ClearDataStructures()
+		self.ShowTitle()
+
+	def OnClose(self, evt):
+		try:
+			self.listener.kill()
+			self.listener.join()
+		except:
+			pass
+		self.Destroy()
+
