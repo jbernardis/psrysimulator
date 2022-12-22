@@ -21,7 +21,7 @@ class ScriptListCtrl(wx.ListCtrl):
 			)
 
 		self.scripts = []
-		self.checked = []
+		self.imgIndex = []
 		self.selected = None
 
 		self.InsertColumn(0, "Script")
@@ -44,8 +44,6 @@ class ScriptListCtrl(wx.ListCtrl):
 		self.SetImageList(self.il, wx.IMAGE_LIST_SMALL)
 
 		self.Bind(wx.EVT_LIST_ITEM_SELECTED, self.OnItemSelected)
-		self.Bind(wx.EVT_LIST_ITEM_DESELECTED, self.OnItemDeselected)
-		self.Bind(wx.EVT_LIST_CACHE_HINT, self.OnItemHint)
 
 		self.ticker = wx.Timer(self)
 		self.Bind(wx.EVT_TIMER, self.onTicker)
@@ -61,12 +59,12 @@ class ScriptListCtrl(wx.ListCtrl):
 		self.refreshAll()
 
 	def ClearChecks(self):
-		self.checked = [self.idxEmpty for _ in range(len(self.scripts))]
+		self.imgIndex = [self.idxEmpty for _ in range(len(self.scripts))]
 		self.refreshAll()
 
 	def AddScript(self, script):
 		self.scripts.append(script)
-		self.checked.append(self.idxEmpty)
+		self.imgIndex.append(self.idxEmpty)
 		self.refreshItemCount()
 
 	def refreshItemCount(self):
@@ -77,40 +75,38 @@ class ScriptListCtrl(wx.ListCtrl):
 		if self.GetItemCount() > 0:
 			self.RefreshItems(0, self.GetItemCount()-1)
 
-	def setSelection(self, tx, dclick=False):
+	def setSelection(self, tx):
 		self.selected = tx;
 		if tx is not None:
 			self.Select(tx)
-			if dclick:
-				self.parent.reportDoubleClick(tx)
-			else:
-				self.parent.reportSelection(tx)
+			self.parent.reportSelection()
+
+	def SelectAll(self):
+		self.imgIndex = [self.idxSelected for _ in range(len(self.scripts))]
+		self.refreshAll()
+		self.parent.reportSelection()
+
+	def SelectNone(self):
+		self.ClearChecks()
+		self.parent.reportSelection()
 
 	def GetChecked(self):
-		return [self.scripts[i].GetName() for i in range(len(self.scripts)) if self.checked[i] == self.idxSelected]
+		return [self.scripts[i].GetName() for i in range(len(self.scripts)) if self.imgIndex[i] == self.idxSelected]
 
 	def OnItemSelected(self, event):
 		idx = event.Index
-		if self.checked[idx] == self.idxEmpty:
-			self.checked[idx] = self.idxSelected
+		if self.imgIndex[idx] == self.idxEmpty:
+			self.imgIndex[idx] = self.idxSelected
 		else:
-			self.checked[idx] = self.idxEmpty
+			self.imgIndex[idx] = self.idxEmpty
 
 		self.setSelection(event.Index)
 
-	def OnItemDeselected(self, evt):
-		self.setSelection(None)
-
-	def OnItemHint(self, evt):
-		if self.GetFirstSelected() == -1:
-			self.setSelection(None)
-
 	def OnGetItemImage(self, item):
-		return self.checked[item]
+		return self.imgIndex[item]
 
 	def OnGetItemText(self, item, col):
 		scr = self.scripts[item]
-
 		if col == 0:
 			return scr.GetName()
 		elif col == 1:

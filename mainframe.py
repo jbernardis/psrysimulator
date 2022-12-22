@@ -58,6 +58,12 @@ class MainFrame(wx.Frame):
 		self.Bind(wx.EVT_BUTTON, self.OnClear, self.bClear)
 		self.bClear.Enable(False)
 
+		self.bSelectAll = wx.Button(self, wx.ID_ANY, "All")
+		self.Bind(wx.EVT_BUTTON, self.OnSelectAll, self.bSelectAll)
+
+		self.bSelectNone = wx.Button(self, wx.ID_ANY, "None")
+		self.Bind(wx.EVT_BUTTON, self.OnSelectNone, self.bSelectNone)
+
 		vsz.AddSpacer(20)
 
 		hsz.AddSpacer(20)
@@ -74,6 +80,10 @@ class MainFrame(wx.Frame):
 		hsz.AddSpacer(20)
 		btnsz = wx.BoxSizer(wx.VERTICAL)
 		btnsz.AddSpacer(20)
+		btnsz.Add(self.bSelectAll)
+		btnsz.AddSpacer(10)
+		btnsz.Add(self.bSelectNone)
+		btnsz.AddSpacer(50)
 		btnsz.Add(self.bStart)
 		btnsz.AddSpacer(10)
 		btnsz.Add(self.bStop)
@@ -121,7 +131,7 @@ class MainFrame(wx.Frame):
 
 		print("finished initialize")
 
-	def reportSelection(self, tx):
+	def reportSelection(self):
 		selectedScripts = self.scriptList.GetChecked()
 		self.startable = [scr for scr in selectedScripts if not self.scripts[scr].IsRunning()]
 		self.stoppable = [scr for scr in selectedScripts if self.scripts[scr].IsRunning()]
@@ -169,6 +179,12 @@ class MainFrame(wx.Frame):
 
 	def OnRefresh(self, _):
 		self.rrServer.SendRequest({"refresh": {"SID": self.sessionid}})
+
+	def OnSelectAll(self, _):
+		self.scriptList.SelectAll()
+
+	def OnSelectNone(self, _):
+		self.scriptList.SelectNone()
 
 	def OnStart(self, _):
 		for scr in self.startable:
