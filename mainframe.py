@@ -173,8 +173,7 @@ class MainFrame(wx.Frame):
 			self.bSubscribe.SetLabel("Disconnect")
 			self.bRefresh.Enable(True)
 			self.enableButtons()
-			self.SendBlockDirRequests()
-				
+
 		self.ShowTitle()
 
 	def OnRefresh(self, _):
@@ -320,7 +319,13 @@ class MainFrame(wx.Frame):
 			elif cmd == "sessionID":
 				self.sessionid = int(parms)
 				self.ShowTitle()
-		
+
+			elif cmd == "end":
+				if parms["type"] == "layout":
+					self.rrServer.SendRequest({"refresh": {"SID": self.sessionid, "type": "trains"}})
+				elif parms["type"] == "trains":
+					pass
+
 	def raiseDisconnectEvent(self): # thread context
 		evt = DisconnectEvent()
 		wx.PostEvent(self, evt)
@@ -329,15 +334,6 @@ class MainFrame(wx.Frame):
 		if self.subscribed:
 			# print("Outgoing request: %s" % json.dumps(req))
 			self.rrServer.SendRequest(req)
-
-	def SendBlockDirRequests(self):
-		pass
-		# for b in self.blocks.values():
-		# 	self.Request({"blockdir": { "block": b.GetName(), "dir": "E" if b.GetEast() else "W"}})
-		# 	sbw, sbe = b.GetStoppingSections()
-		# 	for sb in [sbw, sbe]:
-		# 		if sb:
-		# 			self.Request({"blockdir": { "block": sb.GetName(), "dir": "E" if b.GetEast() else "W"}})
 
 	def onDisconnectEvent(self, _):
 		self.listener = None
