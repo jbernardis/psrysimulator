@@ -261,7 +261,7 @@ class MainFrame(wx.Frame):
 
 	def onDeliveryEvent(self, evt):
 		for cmd, parms in evt.data.items():
-			# print("Dispatch: %s: %s" % (cmd, parms))
+			print("Dispatch: %s: %s" % (cmd, parms))
 			if cmd == "turnout":
 				for p in parms:
 					turnout = p["name"]
