@@ -261,7 +261,7 @@ class MainFrame(wx.Frame):
 
 	def onDeliveryEvent(self, evt):
 		for cmd, parms in evt.data.items():
-			print("Dispatch: %s: %s" % (cmd, parms))
+			#print("Dispatch: %s: %s" % (cmd, parms))
 			if cmd == "turnout":
 				for p in parms:
 					turnout = p["name"]
@@ -273,8 +273,20 @@ class MainFrame(wx.Frame):
 				for p in parms:
 					block = p["name"]
 					state = p["state"]
+					if block in self.blocks:
+						self.blocks[block][0] = state
+					else:
+						self.blocks[block] = [ state, 'E']
+				self.CheckResumeScripts()
+
+			elif cmd == "blockdir":
+				for p in parms:
+					block = p["block"]
 					direction = p["dir"]
-					self.blocks[block] = [ state, direction]
+					if block in self.blocks:
+						self.blocks[block][1] = direction
+					else:
+						self.blocks[block] = [ 0, direction]
 				self.CheckResumeScripts()
 					
 			elif cmd == "signal":

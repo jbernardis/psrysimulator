@@ -119,9 +119,9 @@ class Script (wx.Frame):
 				except KeyError:
 					duration = 1000
 
-				self.parent.Request({"movetrain": {"block": subblock}})
 				if direction is not None:
 					self.parent.Request({"blockdir": { "block": block, "dir": direction}})
+				self.parent.Request({"movetrain": {"block": subblock}})
 				self.parent.Request({"settrain": {"block": block, "name": name, "loco": loco}})
 				self.ticker.StartOnce(duration)
 

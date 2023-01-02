@@ -27,7 +27,7 @@
       {"movetrain":  {"block": "H40", "time": 5000}}
     ],
     "HWX": [
-      {"placetrain": {"block": "H30", "subblock": "H30A", "name": "HWX", "loco": "2468", "time": 1000, "length": 3}},
+      {"placetrain": {"block": "H30", "subblock": "H30A", "dir": "W", "name": "HWX", "loco": "2468", "time": 1000, "length": 3}},
       {"movetrain":  {"block": "H30B", "time": 5000}},
       {"movetrain":  {"block": "H30.W", "time": 5000}},
       {"waitfor":    {"signal": "S12LB", "route": "SRtS10H30", "os": "SOSW", "block": "S10,S10.E,S10.W"}},
