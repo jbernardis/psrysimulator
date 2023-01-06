@@ -100,6 +100,7 @@ class ScriptListCtrl(wx.ListCtrl):
 		else:
 			self.imgIndex[idx] = self.idxEmpty
 
+		self.RefreshItem(idx)
 		self.setSelection(event.Index)
 
 	def OnGetItemImage(self, item):
