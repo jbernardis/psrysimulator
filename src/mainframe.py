@@ -1,6 +1,7 @@
 import wx
 import wx.lib.newevent
 
+import os
 import json
 
 from settings import Settings
@@ -16,7 +17,7 @@ from scrlist import ScriptListCtrl
 
 
 class MainFrame(wx.Frame):
-	def __init__(self):
+	def __init__(self, cmdFolder):
 		wx.Frame.__init__(self, None, style=wx.DEFAULT_FRAME_STYLE)
 		self.sessionid = None
 		self.subscribed = False
@@ -33,6 +34,7 @@ class MainFrame(wx.Frame):
 		self.selectedScripts = []
 		self.startable = []
 		self.stoppable = []
+		print(cmdFolder)
 
 		self.title = "PSRY Simulator"
 		self.Bind(wx.EVT_CLOSE, self.OnClose)
@@ -75,7 +77,7 @@ class MainFrame(wx.Frame):
 		vsz.Add(hsz)
 		vsz.AddSpacer(20)
 
-		self.scriptList = ScriptListCtrl(self)
+		self.scriptList = ScriptListCtrl(self, cmdFolder)
 		hsz = wx.BoxSizer(wx.HORIZONTAL)
 		hsz.AddSpacer(20)
 		btnsz = wx.BoxSizer(wx.VERTICAL)
@@ -121,7 +123,7 @@ class MainFrame(wx.Frame):
 
 		self.ClearDataStructures()
 
-		with open("scripts.scr", "r") as jfp:
+		with open(os.path.join(os.getcwd(), "data", "simscripts.json"), "r") as jfp:
 			scripts = json.load(jfp)
 
 		for scr in scripts:

@@ -1,0 +1,2 @@
+2023-01-11 11:22:39,854 Starting new HTTP connection (1): 192.168.1.144:9000
+2023-01-11 11:22:39,856 http://192.168.1.144:9000 "GET /refresh?SID=11&type=trains HTTP/1.1" 200 None

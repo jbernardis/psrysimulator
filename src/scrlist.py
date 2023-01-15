@@ -1,4 +1,5 @@
 import wx
+import os
 
 
 def makeBlank():
@@ -12,7 +13,7 @@ def makeBlank():
 
 
 class ScriptListCtrl(wx.ListCtrl):
-	def __init__(self, parent):
+	def __init__(self, parent, imgFolder):
 		self.parent = parent
 
 		wx.ListCtrl.__init__(
@@ -36,7 +37,7 @@ class ScriptListCtrl(wx.ListCtrl):
 		self.normalA.SetBackgroundColour(wx.Colour(225, 255, 240))
 		self.normalB.SetBackgroundColour(wx.Colour(138, 255, 197))
 
-		self.loadImages()
+		self.loadImages(imgFolder)
 		self.il = wx.ImageList(24, 24)
 		empty = makeBlank()
 		self.idxEmpty = self.il.Add(empty)
@@ -49,8 +50,8 @@ class ScriptListCtrl(wx.ListCtrl):
 		self.Bind(wx.EVT_TIMER, self.onTicker)
 		self.ticker.Start(1000)
 
-	def loadImages(self):
-		png = wx.Image("selected.png", wx.BITMAP_TYPE_PNG).ConvertToBitmap()
+	def loadImages(self, imgFolder):
+		png = wx.Image(os.path.join(imgFolder, "selected.png"), wx.BITMAP_TYPE_PNG).ConvertToBitmap()
 		mask = wx.Mask(png, wx.BLUE)
 		png.SetMask(mask)
 		self.selected = png
